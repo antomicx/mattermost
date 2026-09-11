@@ -22,6 +22,7 @@ export type UserNotifyProps = {
     mention_keys: string;
     highlight_keys: string;
     desktop_notification_sound?: 'default' | 'Bing' | 'Crackle' | 'Down' | 'Hello' | 'Ripple' | 'Upstairs';
+    dm_notification_sound?: 'default' | 'Bing' | 'Crackle' | 'Down' | 'Hello' | 'Ripple' | 'Upstairs' | '';
     calls_notification_sound?: 'Dynamic' | 'Calm' | 'Urgent' | 'Cheerful';
     desktop_threads?: 'default' | 'all' | 'mention' | 'none';
     email_threads?: 'default' | 'all' | 'mention' | 'none';

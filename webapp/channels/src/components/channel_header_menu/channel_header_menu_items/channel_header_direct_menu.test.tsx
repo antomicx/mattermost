@@ -114,4 +114,31 @@ describe('components/ChannelHeaderMenu/ChannelHeaderDirectMenu', () => {
 
         expect(screen.queryByText(/Auto-translation/i)).not.toBeInTheDocument();
     });
+
+    it('shows Notification Preferences when channel is not archived', () => {
+        renderWithContext(
+            <WithTestMenuContext>
+                <ChannelHeaderDirectMenu {...defaultProps}/>
+            </WithTestMenuContext>,
+            getBaseState(),
+        );
+
+        expect(screen.getByText('Notification Preferences')).toBeInTheDocument();
+    });
+
+    it('does not show Notification Preferences when channel is archived', () => {
+        const archivedChannel = TestHelper.getChannelMock({id: DM_CHANNEL_ID, type: 'D', delete_at: 12345});
+        renderWithContext(
+            <WithTestMenuContext>
+                <ChannelHeaderDirectMenu
+                    {...defaultProps}
+                    channel={archivedChannel}
+                />
+            </WithTestMenuContext>,
+            getBaseState(),
+        );
+
+        expect(screen.queryByText('Notification Preferences')).not.toBeInTheDocument();
+    });
 });
+

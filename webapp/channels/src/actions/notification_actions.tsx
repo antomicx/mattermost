@@ -86,14 +86,20 @@ export function isDesktopSoundEnabled(channelMember: ChannelMembership | undefin
 /**
  * This function returns the desktop notification sound from the channel member and user.
  * It checks if desktop notification sound is defined in the channel member and if not, it checks if it's defined in the user preferences.
+ * For direct message channels, it checks if dm_notification_sound is defined in the user preferences before checking desktop_notification_sound.
  * If neither is defined, it returns the default sound 'BING'.
  */
-export function getDesktopNotificationSound(channelMember: ChannelMembership | undefined, user: UserProfile | undefined) {
+export function getDesktopNotificationSound(channelMember: ChannelMembership | undefined, user: UserProfile | undefined, channelType?: string) {
     const notificationSoundInChannelMember = channelMember?.notify_props?.desktop_notification_sound;
     const notificationSoundInUser = user?.notify_props?.desktop_notification_sound;
+    const dmNotificationSoundInUser = user?.notify_props?.dm_notification_sound;
 
     if (notificationSoundInChannelMember && notificationSoundInChannelMember !== DesktopNotificationSounds.DEFAULT) {
         return notificationSoundInChannelMember;
+    }
+
+    if (channelType === Constants.DM_CHANNEL && dmNotificationSoundInUser && dmNotificationSoundInUser !== DesktopNotificationSounds.DEFAULT) {
+        return dmNotificationSoundInUser;
     }
 
     if (notificationSoundInUser && notificationSoundInUser !== DesktopNotificationSounds.DEFAULT) {
@@ -139,7 +145,7 @@ export function sendDesktopNotification(post: Post, msgProps: NewPostMessageProp
 
         //Play a sound if explicitly set in settings
         const desktopSoundEnabled = isDesktopSoundEnabled(member, user);
-        const soundName = getDesktopNotificationSound(member, user);
+        const soundName = getDesktopNotificationSound(member, user, channel.type || msgProps.channel_type);
 
         const updatedState = getState();
         const url = isCrtReply ? getPermalinkURL(updatedState, teamId, post.id) : getChannelURL(updatedState, channel, teamId);

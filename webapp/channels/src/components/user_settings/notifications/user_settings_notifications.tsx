@@ -55,6 +55,7 @@ type State = {
     desktopSound: UserNotifyProps['desktop_sound'];
     callsDesktopSound: UserNotifyProps['calls_desktop_sound'];
     desktopNotificationSound: UserNotifyProps['desktop_notification_sound'];
+    dmNotificationSound: UserNotifyProps['dm_notification_sound'];
     callsNotificationSound: UserNotifyProps['calls_notification_sound'];
     usernameKey: boolean;
     isCustomKeysWithNotificationInputChecked: boolean;
@@ -81,6 +82,7 @@ function getDefaultStateFromProps(props: Props): State {
     let sound: UserNotifyProps['desktop_sound'] = 'true';
     let callsSound: UserNotifyProps['calls_desktop_sound'] = 'true';
     let desktopNotificationSound: UserNotifyProps['desktop_notification_sound'] = notificationSoundKeys[0] as UserNotifyProps['desktop_notification_sound'];
+    let dmNotificationSound: UserNotifyProps['dm_notification_sound'] = 'default';
     let callsNotificationSound: UserNotifyProps['calls_notification_sound'] = 'Calm';
     let comments: UserNotifyProps['comments'] = 'never';
     let enableEmail: UserNotifyProps['email'] = 'true';
@@ -114,6 +116,9 @@ function getDefaultStateFromProps(props: Props): State {
         }
         if (props.user.notify_props.desktop_notification_sound) {
             desktopNotificationSound = props.user.notify_props.desktop_notification_sound;
+        }
+        if (props.user.notify_props.dm_notification_sound) {
+            dmNotificationSound = props.user.notify_props.dm_notification_sound;
         }
         if (props.user.notify_props.calls_notification_sound) {
             callsNotificationSound = props.user.notify_props.calls_notification_sound;
@@ -198,6 +203,7 @@ function getDefaultStateFromProps(props: Props): State {
         desktopSound: sound,
         callsDesktopSound: callsSound,
         desktopNotificationSound,
+        dmNotificationSound,
         callsNotificationSound,
         usernameKey,
         customKeysWithNotification,
@@ -246,6 +252,7 @@ class NotificationsTab extends React.PureComponent<Props, State> {
         data.desktop_sound = this.state.desktopSound;
         data.calls_desktop_sound = this.state.callsDesktopSound;
         data.desktop_notification_sound = this.state.desktopNotificationSound;
+        data.dm_notification_sound = this.state.dmNotificationSound;
         data.calls_notification_sound = this.state.callsNotificationSound;
         data.desktop = this.state.desktopActivity;
         data.desktop_threads = this.state.desktopThreads;
@@ -1161,6 +1168,7 @@ class NotificationsTab extends React.PureComponent<Props, State> {
                         areAllSectionsInactive={areAllSectionsInactive}
                         desktopSound={this.state.desktopSound}
                         desktopNotificationSound={this.state.desktopNotificationSound}
+                        dmNotificationSound={this.state.dmNotificationSound}
                         isCallsRingingEnabled={this.props.isCallsRingingEnabled}
                         callsDesktopSound={this.state.callsDesktopSound}
                         callsNotificationSound={this.state.callsNotificationSound}

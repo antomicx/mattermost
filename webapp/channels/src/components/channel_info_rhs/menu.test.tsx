@@ -75,7 +75,7 @@ describe('channel_info_rhs/menu', () => {
         expect(props.actions.openNotificationSettings).toHaveBeenCalled();
     });
 
-    test('should NOT display notifications preferences in a DM', async () => {
+    test('should display notifications preferences in a DM', async () => {
         const props = {
             ...defaultProps,
             channel: {type: Constants.DM_CHANNEL} as Channel,
@@ -91,7 +91,11 @@ describe('channel_info_rhs/menu', () => {
             props.actions.getChannelStats();
         });
 
-        expect(screen.queryByText('Notification Preferences')).not.toBeInTheDocument();
+        const notificationItem = screen.getByText('Notification Preferences');
+        expect(notificationItem).toBeInTheDocument();
+
+        fireEvent.click(notificationItem);
+        expect(props.actions.openNotificationSettings).toHaveBeenCalled();
     });
 
     test('should NOT display notifications preferences in an archived channel', async () => {

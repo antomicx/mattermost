@@ -20,7 +20,7 @@ import RadioSettingItem from 'components/widgets/modals/components/radio_setting
 import type {SelectOption} from 'components/widgets/modals/components/react_select_item';
 
 import {focusElement} from 'utils/a11y_utils';
-import {NotificationLevels, DesktopSound, IgnoreChannelMentions} from 'utils/constants';
+import {Constants, NotificationLevels, DesktopSound, IgnoreChannelMentions} from 'utils/constants';
 import {convertDesktopSoundNotifyPropFromUserToDesktop, DesktopNotificationSounds, getValueOfNotificationSoundsSelect, stopTryNotificationRing, tryNotificationSound} from 'utils/notification_sounds';
 
 import ResetToDefaultButton, {SectionName} from './reset_to_default_button';
@@ -128,38 +128,56 @@ export default function ChannelNotificationsModal(props: Props) {
         });
     }
 
+    const isDM = props.channel?.type === Constants.DM_CHANNEL;
+    const isGM = props.channel?.type === Constants.GM_CHANNEL;
+    const isDirectOrGroup = isDM || isGM;
+
     const muteOrIgnoreSectionContent = (
         <>
             <CheckboxSettingItem
                 inputFieldTitle={
-                    <FormattedMessage
-                        id='channel_notifications.muteChannelTitle'
-                        defaultMessage='Mute channel'
-                    />
+                    isDirectOrGroup ? (
+                        <FormattedMessage
+                            id='channel_notifications.muteConversationTitle'
+                            defaultMessage='Mute conversation'
+                        />
+                    ) : (
+                        <FormattedMessage
+                            id='channel_notifications.muteChannelTitle'
+                            defaultMessage='Mute channel'
+                        />
+                    )
                 }
-                description={formatMessage({
-                    id: 'channel_notifications.muteChannelDesc',
-                    defaultMessage: 'Turns off notifications for this channel. You’ll still see badges if you’re mentioned.',
-                })}
+                description={
+                    isDirectOrGroup ? formatMessage({
+                        id: 'channel_notifications.muteConversationDesc',
+                        defaultMessage: 'Turns off notifications for this conversation. You’ll still see badges if you’re mentioned.',
+                    }) : formatMessage({
+                        id: 'channel_notifications.muteChannelDesc',
+                        defaultMessage: 'Turns off notifications for this channel. You’ll still see badges if you’re mentioned.',
+                    })
+                }
                 inputFieldValue={settings.mark_unread === 'mention'}
                 inputFieldData={utils.MuteChannelInputFieldData}
                 handleChange={(e) => handleChange({mark_unread: e ? 'mention' : 'all'})}
             />
-            <CheckboxSettingItem
-                inputFieldTitle={
-                    <FormattedMessage
-                        id='channel_notifications.ignoreMentionsTitle'
-                        defaultMessage='Ignore mentions for @channel, @here and @all'
-                    />
-                }
-                description={formatMessage({
-                    id: 'channel_notifications.ignoreMentionsDesc',
-                    defaultMessage: 'When enabled, @channel, @here and @all will not trigger mentions or mention notifications in this channel',
-                })}
-                inputFieldValue={settings.ignore_channel_mentions === 'on'}
-                inputFieldData={utils.IgnoreMentionsInputFieldData}
-                handleChange={(e) => handleChange({ignore_channel_mentions: e ? 'on' : 'off'})}
-            />
+            {!isDM && (
+                <CheckboxSettingItem
+                    inputFieldTitle={
+                        <FormattedMessage
+                            id='channel_notifications.ignoreMentionsTitle'
+                            defaultMessage='Ignore mentions for @channel, @here and @all'
+                        />
+                    }
+                    description={formatMessage({
+                        id: 'channel_notifications.ignoreMentionsDesc',
+                        defaultMessage: 'When enabled, @channel, @here and @all will not trigger mentions or mention notifications in this channel',
+                    })}
+                    inputFieldValue={settings.ignore_channel_mentions === 'on'}
+                    inputFieldData={utils.IgnoreMentionsInputFieldData}
+                    handleChange={(e) => handleChange({ignore_channel_mentions: e ? 'on' : 'off'})}
+                />
+            )}
         </>
     );
 
@@ -303,6 +321,7 @@ export default function ChannelNotificationsModal(props: Props) {
                         userNotifyProps={props.currentUser.notify_props}
                         userSelectedChannelNotifyProps={settings}
                         onClick={handleResetToDefaultClicked}
+                        channelType={props.channel?.type}
                     />
                 }
                 description={formatMessage({
@@ -323,6 +342,7 @@ export default function ChannelNotificationsModal(props: Props) {
                         userNotifyProps={props.currentUser.notify_props}
                         userSelectedChannelNotifyProps={settings}
                         onClick={handleResetToDefaultClicked}
+                        channelType={props.channel?.type}
                     />
                 }
                 description={formatMessage({
@@ -344,16 +364,30 @@ export default function ChannelNotificationsModal(props: Props) {
                 />
             }
             title={
-                <FormattedMessage
-                    id='channel_notifications.alertBanner.title'
-                    defaultMessage='This channel is muted'
-                />
+                isDirectOrGroup ? (
+                    <FormattedMessage
+                        id='channel_notifications.alertBanner.conversationTitle'
+                        defaultMessage='This conversation is muted'
+                    />
+                ) : (
+                    <FormattedMessage
+                        id='channel_notifications.alertBanner.title'
+                        defaultMessage='This channel is muted'
+                    />
+                )
             }
             message={
-                <FormattedMessage
-                    id='channel_notifications.alertBanner.description'
-                    defaultMessage='All other notification preferences for this channel are disabled'
-                />
+                isDirectOrGroup ? (
+                    <FormattedMessage
+                        id='channel_notifications.alertBanner.conversationDescription'
+                        defaultMessage='All other notification preferences for this conversation are disabled'
+                    />
+                ) : (
+                    <FormattedMessage
+                        id='channel_notifications.alertBanner.description'
+                        defaultMessage='All other notification preferences for this channel are disabled'
+                    />
+                )
             }
         />
     );
@@ -398,7 +432,7 @@ export default function ChannelNotificationsModal(props: Props) {
                 id: 'channel_notifications.preferences',
                 defaultMessage: 'Notification Preferences',
             })}
-            subtitle={props.channel.display_name}
+            subtitle={props.channel.display_name || props.channel.name}
         />
     );
 
@@ -435,7 +469,7 @@ export default function ChannelNotificationsModal(props: Props) {
                     />
                 </fieldset>
                 {desktopAndMobileNotificationSectionContent}
-                {props.collapsedReplyThreads &&
+                {props.collapsedReplyThreads && !isDM &&
                     <>
                         <div className='ChannelNotificationModal__divider'/>
                         <ModalSection

@@ -426,6 +426,36 @@ describe('notification_actions', () => {
             });
         });
 
+        test('should use dm_notification_sound for direct messages when specified', () => {
+            const dingSpy = jest.spyOn(NotificationSounds, 'ding');
+            baseState.entities.users.profiles.current_user_id.notify_props.desktop_sound = 'true';
+            baseState.entities.users.profiles.current_user_id.notify_props.desktop_notification_sound = 'Crackle';
+            baseState.entities.users.profiles.current_user_id.notify_props.dm_notification_sound = 'Hello';
+            const dmMsgProps = {
+                ...msgProps,
+                channel_type: Constants.DM_CHANNEL,
+            };
+            const store = testConfigureStore(baseState);
+            return store.dispatch(sendDesktopNotification(post, dmMsgProps)).then(() => {
+                expect(dingSpy).toHaveBeenCalledWith('Hello');
+            });
+        });
+
+        test('should fallback to desktop_notification_sound for direct messages when dm_notification_sound is default', () => {
+            const dingSpy = jest.spyOn(NotificationSounds, 'ding');
+            baseState.entities.users.profiles.current_user_id.notify_props.desktop_sound = 'true';
+            baseState.entities.users.profiles.current_user_id.notify_props.desktop_notification_sound = 'Crackle';
+            baseState.entities.users.profiles.current_user_id.notify_props.dm_notification_sound = 'default';
+            const dmMsgProps = {
+                ...msgProps,
+                channel_type: Constants.DM_CHANNEL,
+            };
+            const store = testConfigureStore(baseState);
+            return store.dispatch(sendDesktopNotification(post, dmMsgProps)).then(() => {
+                expect(dingSpy).toHaveBeenCalledWith('Crackle');
+            });
+        });
+
         describe('CollapsedThreads: false', () => {
             beforeEach(() => {
                 crt.value = 'off';
@@ -793,5 +823,64 @@ describe('getDesktopNotificationSound', () => {
         const channelMember2 = {};
         const user2 = {};
         expect(getDesktopNotificationSound(channelMember2, user2)).toBe('Bing');
+    });
+
+    test('should return dm_notification_sound for DM channel if channel member sound is default', () => {
+        const channelMember = {
+            notify_props: {
+                desktop_notification_sound: 'default',
+            },
+        };
+        const user = {
+            notify_props: {
+                desktop_notification_sound: 'Crackle',
+                dm_notification_sound: 'Hello',
+            },
+        };
+        expect(getDesktopNotificationSound(channelMember, user, Constants.DM_CHANNEL)).toBe('Hello');
+    });
+
+    test('should return channel member sound over dm_notification_sound for DM channel if channel member sound is customized', () => {
+        const channelMember = {
+            notify_props: {
+                desktop_notification_sound: 'Down',
+            },
+        };
+        const user = {
+            notify_props: {
+                desktop_notification_sound: 'Crackle',
+                dm_notification_sound: 'Hello',
+            },
+        };
+        expect(getDesktopNotificationSound(channelMember, user, Constants.DM_CHANNEL)).toBe('Down');
+    });
+
+    test('should fallback to desktop_notification_sound for DM channel if dm_notification_sound is default or not set', () => {
+        const channelMember = {};
+        const user1 = {
+            notify_props: {
+                desktop_notification_sound: 'Crackle',
+                dm_notification_sound: 'default',
+            },
+        };
+        expect(getDesktopNotificationSound(channelMember, user1, Constants.DM_CHANNEL)).toBe('Crackle');
+
+        const user2 = {
+            notify_props: {
+                desktop_notification_sound: 'Crackle',
+            },
+        };
+        expect(getDesktopNotificationSound(channelMember, user2, Constants.DM_CHANNEL)).toBe('Crackle');
+    });
+
+    test('should ignore dm_notification_sound for non-DM channel', () => {
+        const channelMember = {};
+        const user = {
+            notify_props: {
+                desktop_notification_sound: 'Crackle',
+                dm_notification_sound: 'Hello',
+            },
+        };
+        expect(getDesktopNotificationSound(channelMember, user, Constants.OPEN_CHANNEL)).toBe('Crackle');
     });
 });

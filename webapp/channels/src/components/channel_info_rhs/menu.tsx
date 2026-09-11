@@ -134,7 +134,7 @@ export default function Menu(props: MenuProps) {
 
     const [loadingStats, setLoadingStats] = useState(true);
 
-    const showNotificationPreferences = channel.type !== Constants.DM_CHANNEL && !isArchived;
+    const showNotificationPreferences = !isArchived;
     const showMembers = channel.type !== Constants.DM_CHANNEL;
     const showChannelSettings = channel.type !== Constants.DM_CHANNEL && channel.type !== Constants.GM_CHANNEL && !isArchived;
     const fileCount = channelStats?.files_count >= 0 ? channelStats?.files_count : 0;

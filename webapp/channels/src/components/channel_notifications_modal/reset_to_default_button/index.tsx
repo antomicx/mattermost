@@ -7,7 +7,7 @@ import {FormattedMessage} from 'react-intl';
 import type {ChannelMembership, ChannelNotifyProps} from '@mattermost/types/channels';
 import type {UserNotifyProps, UserProfile} from '@mattermost/types/users';
 
-import {DesktopSound, NotificationLevels} from 'utils/constants';
+import {Constants, DesktopSound, NotificationLevels} from 'utils/constants';
 import {notificationSoundKeys, convertDesktopSoundNotifyPropFromUserToDesktop} from 'utils/notification_sounds';
 
 export enum SectionName {
@@ -24,6 +24,7 @@ export interface Props {
     /** The user's selected channel notify props which is not yet saved */
     userSelectedChannelNotifyProps: ChannelMembership['notify_props'];
     onClick: (channelNotifyPropsDefaultedToUserNotifyProps: ChannelMembership['notify_props'], sectionName: SectionName) => void;
+    channelType?: ChannelNotifyProps['desktop'] | string;
 }
 
 export default function ResetToDefaultButton(props: Props) {
@@ -32,9 +33,14 @@ export default function ResetToDefaultButton(props: Props) {
         const isThreadReplyNotificationsSame = props.userNotifyProps.desktop_threads === props.userSelectedChannelNotifyProps.desktop_threads;
         const isSoundSame = convertDesktopSoundNotifyPropFromUserToDesktop(props.userNotifyProps.desktop_sound) === props.userSelectedChannelNotifyProps.desktop_sound;
 
+        const isDM = props.channelType === Constants.DM_CHANNEL;
+        const defaultSound = (isDM && props.userNotifyProps.dm_notification_sound && props.userNotifyProps.dm_notification_sound !== 'default') ?
+            props.userNotifyProps.dm_notification_sound :
+            props.userNotifyProps.desktop_notification_sound;
+
         let isNotificationSoundSame = false;
-        if (props.userNotifyProps.desktop_notification_sound) {
-            isNotificationSoundSame = props.userNotifyProps.desktop_notification_sound === props.userSelectedChannelNotifyProps.desktop_notification_sound;
+        if (defaultSound && defaultSound !== 'default') {
+            isNotificationSoundSame = defaultSound === props.userSelectedChannelNotifyProps.desktop_notification_sound;
         } else {
             // It could happen that the notification sound is not set in the user's notify props. That case we should assume its the Bing sound.
             isNotificationSoundSame = props.userSelectedChannelNotifyProps.desktop_notification_sound === notificationSoundKeys[0] as ChannelNotifyProps['desktop_notification_sound'];
@@ -42,6 +48,7 @@ export default function ResetToDefaultButton(props: Props) {
 
         return isNotifyMeAboutSame && isThreadReplyNotificationsSame && isSoundSame && isNotificationSoundSame;
     }, [
+        props.channelType,
         props.userNotifyProps.desktop,
         props.userSelectedChannelNotifyProps.desktop,
         props.userNotifyProps.desktop_threads,
@@ -49,6 +56,7 @@ export default function ResetToDefaultButton(props: Props) {
         props.userNotifyProps.desktop_sound,
         props.userSelectedChannelNotifyProps.desktop_sound,
         props.userNotifyProps.desktop_notification_sound,
+        props.userNotifyProps.dm_notification_sound,
         props.userSelectedChannelNotifyProps.desktop_notification_sound,
     ]);
 
@@ -77,7 +85,7 @@ export default function ResetToDefaultButton(props: Props) {
     }
 
     function handleOnClick() {
-        const channelNotifyPropsDefaultedToUserNotifyProps = resetChannelsNotificationToUsersDefault(props.userNotifyProps, props.sectionName);
+        const channelNotifyPropsDefaultedToUserNotifyProps = resetChannelsNotificationToUsersDefault(props.userNotifyProps, props.sectionName, props.channelType);
         props.onClick(channelNotifyPropsDefaultedToUserNotifyProps, props.sectionName);
     }
 
@@ -96,13 +104,21 @@ export default function ResetToDefaultButton(props: Props) {
     );
 }
 
-export function resetChannelsNotificationToUsersDefault(userNotifyProps: UserNotifyProps, sectionName: SectionName): ChannelMembership['notify_props'] {
+export function resetChannelsNotificationToUsersDefault(userNotifyProps: UserNotifyProps, sectionName: SectionName, channelType?: ChannelNotifyProps['desktop'] | string): ChannelMembership['notify_props'] {
     if (sectionName === SectionName.Desktop) {
+        const isDM = channelType === Constants.DM_CHANNEL;
+        let defaultSound = notificationSoundKeys[0];
+        if (isDM && userNotifyProps.dm_notification_sound && userNotifyProps.dm_notification_sound !== 'default') {
+            defaultSound = userNotifyProps.dm_notification_sound;
+        } else if (userNotifyProps?.desktop_notification_sound && userNotifyProps.desktop_notification_sound !== 'default') {
+            defaultSound = userNotifyProps.desktop_notification_sound;
+        }
+
         return {
             desktop: userNotifyProps.desktop,
             desktop_threads: userNotifyProps?.desktop_threads ?? NotificationLevels.ALL,
             desktop_sound: userNotifyProps && userNotifyProps.desktop_sound ? convertDesktopSoundNotifyPropFromUserToDesktop(userNotifyProps.desktop_sound) : DesktopSound.ON,
-            desktop_notification_sound: userNotifyProps?.desktop_notification_sound ?? notificationSoundKeys[0] as ChannelNotifyProps['desktop_notification_sound'],
+            desktop_notification_sound: defaultSound as ChannelNotifyProps['desktop_notification_sound'],
         };
     }
 

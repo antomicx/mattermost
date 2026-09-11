@@ -6,6 +6,8 @@ import React from 'react';
 import type {ChannelMembership} from '@mattermost/types/channels';
 import type {UserNotifyProps} from '@mattermost/types/users';
 
+import {General} from 'mattermost-redux/constants';
+
 import ChannelNotificationsModal, {createChannelNotifyPropsFromSelectedSettings, getInitialValuesOfChannelNotifyProps, areDesktopAndMobileSettingsDifferent} from 'components/channel_notifications_modal/channel_notifications_modal';
 import type {Props} from 'components/channel_notifications_modal/channel_notifications_modal';
 
@@ -345,6 +347,46 @@ describe('ChannelNotificationsModal', () => {
                 },
             ),
         );
+    });
+
+    test('should show conversation labels and hide channel-specific settings for DM channels', async () => {
+        const props = {
+            ...baseProps,
+            channel: TestHelper.getChannelMock({
+                id: 'dm_channel_id',
+                type: General.DM_CHANNEL,
+                display_name: 'test_teammate',
+            }),
+        };
+        renderWithContext(<ChannelNotificationsModal {...props}/>);
+
+        expect(screen.getByText('Mute conversation')).toBeInTheDocument();
+        expect(screen.queryByText('Mute channel')).not.toBeInTheDocument();
+        expect(screen.queryByText('Ignore mentions for @channel, @here and @all')).not.toBeInTheDocument();
+        expect(screen.queryByText('Follow all threads in this channel')).not.toBeInTheDocument();
+        expect(screen.getByText('Desktop Notifications')).toBeInTheDocument();
+        expect(screen.getByText('Mobile Notifications')).toBeInTheDocument();
+    });
+
+    test('should show conversation muted banner for muted DM channels', async () => {
+        const props = {
+            ...baseProps,
+            channel: TestHelper.getChannelMock({
+                id: 'dm_channel_id',
+                type: General.DM_CHANNEL,
+                display_name: 'test_teammate',
+            }),
+            channelMember: {
+                notify_props: {
+                    ...baseProps.channelMember?.notify_props,
+                    mark_unread: 'mention',
+                },
+            } as unknown as ChannelMembership,
+        };
+        renderWithContext(<ChannelNotificationsModal {...props}/>);
+
+        expect(screen.getByText('This conversation is muted')).toBeInTheDocument();
+        expect(screen.getByText('All other notification preferences for this conversation are disabled')).toBeInTheDocument();
     });
 });
 

@@ -16,6 +16,7 @@ import {getOptionLabel, type SelectOption} from 'components/widgets/modals/compo
 
 import {UserSettingsNotificationSections} from 'utils/constants';
 import {
+    DesktopNotificationSounds,
     notificationSoundKeys,
     stopTryNotificationRing,
     tryNotificationSound,
@@ -40,6 +41,7 @@ export type Props = {
     areAllSectionsInactive: boolean;
     desktopSound: UserNotifyProps['desktop_sound'];
     desktopNotificationSound: UserNotifyProps['desktop_notification_sound'];
+    dmNotificationSound?: UserNotifyProps['dm_notification_sound'];
     isCallsRingingEnabled: UserSettingsNotificationsProps['isCallsRingingEnabled'];
     callsDesktopSound: UserNotifyProps['calls_desktop_sound'];
     callsNotificationSound: UserNotifyProps['calls_notification_sound'];
@@ -56,6 +58,7 @@ function DesktopNotificationSoundsSettings({
     areAllSectionsInactive,
     desktopSound,
     desktopNotificationSound,
+    dmNotificationSound,
     isCallsRingingEnabled,
     callsDesktopSound,
     callsNotificationSound,
@@ -83,6 +86,17 @@ function DesktopNotificationSoundsSettings({
         }
     }, [setParentState]);
 
+    const handleChangeForDmNotificationSoundCheckbox = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+        if (event.target.checked) {
+            const soundToSet = (desktopNotificationSound && notificationSoundKeys.includes(desktopNotificationSound as string)) ? desktopNotificationSound : DesktopNotificationSounds.BING;
+            setParentState('dmNotificationSound', soundToSet);
+            tryNotificationSound(soundToSet);
+        } else {
+            setParentState('dmNotificationSound', 'default');
+            stopTryNotificationRing();
+        }
+    }, [desktopNotificationSound, setParentState]);
+
     const handleChangeForIncomginCallSoundCheckbox = useCallback((event: ChangeEvent<HTMLInputElement>) => {
         const value = event.target.checked ? 'true' : 'false';
         setParentState('callsDesktopSound', value);
@@ -101,6 +115,15 @@ function DesktopNotificationSoundsSettings({
         }
     }, [setParentState]);
 
+    const handleChangeForDmNotificationSoundSelect = useCallback((selectedOption: OnChangeValue<SelectOption, boolean>) => {
+        stopTryNotificationRing();
+
+        if (selectedOption && 'value' in selectedOption) {
+            setParentState('dmNotificationSound', selectedOption.value);
+            tryNotificationSound(selectedOption.value);
+        }
+    }, [setParentState]);
+
     const handleChangeForIncomingCallSoundSelect = useCallback((selectedOption: OnChangeValue<SelectOption, boolean>) => {
         stopTryNotificationRing();
 
@@ -114,6 +137,7 @@ function DesktopNotificationSoundsSettings({
         const maximizedSettingInputs = [];
 
         const isMessageNotificationSoundChecked = desktopSound === 'true';
+        const isDmNotificationSoundChecked = Boolean(dmNotificationSound && dmNotificationSound !== 'default');
         const messageSoundSection = (
             <Fragment key='messageSoundSection'>
                 <div className='checkbox inlineCheckboxSelect'>
@@ -122,6 +146,7 @@ function DesktopNotificationSoundsSettings({
                             type='checkbox'
                             checked={desktopSound === 'true'}
                             onChange={handleChangeForMessageNotificationSoundCheckbox}
+                            data-testid='messageNotificationSoundCheckbox'
                         />
                         <span id='messageNotificationSoundLabel'>
                             <FormattedMessage
@@ -154,6 +179,49 @@ function DesktopNotificationSoundsSettings({
             </Fragment>
         );
         maximizedSettingInputs.push(messageSoundSection);
+
+        const dmSoundSection = (
+            <Fragment key='dmSoundSection'>
+                <br/>
+                <div className='checkbox inlineCheckboxSelect'>
+                    <label>
+                        <input
+                            type='checkbox'
+                            checked={isMessageNotificationSoundChecked && isDmNotificationSoundChecked}
+                            disabled={!isMessageNotificationSoundChecked}
+                            onChange={handleChangeForDmNotificationSoundCheckbox}
+                            data-testid='dmNotificationSoundCheckbox'
+                        />
+                        <span id='dmNotificationSoundLabel'>
+                            <FormattedMessage
+                                id='user.settings.notifications.desktopNotificationSound.dmNotificationSound'
+                                defaultMessage='Use a different sound for direct messages'
+                            />
+                        </span>
+                    </label>
+                    <ReactSelect
+                        id='dmNotificationSoundSelect'
+                        inputId='dmNotificationSoundSelectInput'
+                        className='react-select inlineSelect'
+                        classNamePrefix='react-select'
+                        options={optionsOfMessageNotificationSoundsSelect}
+                        isClearable={false}
+                        isSearchable={false}
+                        isDisabled={!isMessageNotificationSoundChecked || !isDmNotificationSoundChecked}
+                        placeholder={intl.formatMessage({
+                            id: 'user.settings.notifications.desktopNotificationSound.soundSelectPlaceholder',
+                            defaultMessage: 'Select a sound',
+                        })}
+                        components={{IndicatorSeparator: NoIndicatorSeparatorComponent}}
+                        value={getValueOfNotificationSoundsSelect(isDmNotificationSoundChecked ? dmNotificationSound : undefined)}
+                        onChange={handleChangeForDmNotificationSoundSelect}
+                        aria-labelledby='dmNotificationSoundLabel'
+                        getOptionLabel={(option) => getOptionLabel(option, intl)}
+                    />
+                </div>
+            </Fragment>
+        );
+        maximizedSettingInputs.push(dmSoundSection);
 
         if (isCallsRingingEnabled) {
             const isIncomingCallSoundChecked = callsDesktopSound === 'true';
@@ -203,6 +271,9 @@ function DesktopNotificationSoundsSettings({
         handleChangeForMessageNotificationSoundCheckbox,
         handleChangeForMessageNotificationSoundSelect,
         desktopNotificationSound,
+        dmNotificationSound,
+        handleChangeForDmNotificationSoundCheckbox,
+        handleChangeForDmNotificationSoundSelect,
         isCallsRingingEnabled,
         callsDesktopSound,
         handleChangeForIncomginCallSoundCheckbox,
@@ -253,7 +324,7 @@ function DesktopNotificationSoundsSettings({
                     defaultMessage='Desktop notification sounds'
                 />
             }
-            describe={getCollapsedText(isCallsRingingEnabled, desktopSound, desktopNotificationSound, callsDesktopSound, callsNotificationSound)}
+            describe={getCollapsedText(isCallsRingingEnabled, desktopSound, desktopNotificationSound, callsDesktopSound, callsNotificationSound, dmNotificationSound)}
             section={UserSettingsNotificationSections.DESKTOP_NOTIFICATION_SOUND}
             updateSection={handleChangeForMinSection}
         />
@@ -270,9 +341,11 @@ function getCollapsedText(
     desktopNotificationSound: UserNotifyProps['desktop_notification_sound'],
     callsDesktopSound: UserNotifyProps['calls_desktop_sound'],
     callsNotificationSound: UserNotifyProps['calls_notification_sound'],
+    dmNotificationSound?: UserNotifyProps['dm_notification_sound'],
 ) {
     const desktopNotificationSoundIsSelected = notificationSoundKeys.includes(desktopNotificationSound as string);
     const callNotificationSoundIsSelected = callNotificationSoundKeys.includes(callsNotificationSound as string);
+    const dmNotificationSoundIsSelected = Boolean(dmNotificationSound && dmNotificationSound !== 'default' && notificationSoundKeys.includes(dmNotificationSound as string));
 
     let hasCallsSound: boolean | null = null;
     if (isCallsRingingEnabled && callNotificationSoundIsSelected) {
@@ -292,8 +365,23 @@ function getCollapsedText(
         }
     }
 
+    const hasDmSound = hasDesktopSound && dmNotificationSoundIsSelected;
+
     if (hasDesktopSound !== null && hasCallsSound !== null) {
         if (hasDesktopSound && hasCallsSound) {
+            if (hasDmSound) {
+                return (
+                    <FormattedMessage
+                        id='user.settings.notifications.desktopNotificationSound.hasDesktopDmAndCallsSound'
+                        defaultMessage='"{desktopSound}" for messages, "{dmSound}" for direct messages, "{callsSound}" for calls'
+                        values={{
+                            desktopSound: desktopNotificationSound,
+                            dmSound: dmNotificationSound,
+                            callsSound: callsNotificationSound,
+                        }}
+                    />
+                );
+            }
             return (
                 <FormattedMessage
                     id='user.settings.notifications.desktopNotificationSound.hasDesktopAndCallsSound'
@@ -313,6 +401,18 @@ function getCollapsedText(
                 />
             );
         } else if (hasDesktopSound && !hasCallsSound) {
+            if (hasDmSound) {
+                return (
+                    <FormattedMessage
+                        id='user.settings.notifications.desktopNotificationSound.hasDesktopDmAndNoCallsSound'
+                        defaultMessage='"{desktopSound}" for messages, "{dmSound}" for direct messages, no sound for calls'
+                        values={{
+                            desktopSound: desktopNotificationSound,
+                            dmSound: dmNotificationSound,
+                        }}
+                    />
+                );
+            }
             return (
                 <FormattedMessage
                     id='user.settings.notifications.desktopNotificationSound.hasDesktopAndNoCallsSound'
@@ -330,6 +430,18 @@ function getCollapsedText(
         );
     } else if (hasDesktopSound !== null && hasCallsSound === null) {
         if (hasDesktopSound) {
+            if (hasDmSound) {
+                return (
+                    <FormattedMessage
+                        id='user.settings.notifications.desktopNotificationSound.hasDesktopAndDmSound'
+                        defaultMessage='"{desktopSound}" for messages, "{dmSound}" for direct messages'
+                        values={{
+                            desktopSound: desktopNotificationSound,
+                            dmSound: dmNotificationSound,
+                        }}
+                    />
+                );
+            }
             return (
                 <FormattedMessage
                     id='user.settings.notifications.desktopNotificationSound.hasDesktopSound'
