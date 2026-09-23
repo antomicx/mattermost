@@ -10,8 +10,14 @@ import (
 )
 
 const (
-	maxUsersLimit     = 200
-	maxUsersHardLimit = 250
+	// MBI-0001: the open-source user cap is removed in the MBI build. The
+	// unlicensed enforcement branch in GetServerLimits is guarded by
+	// `maxUsersLimit > 0`, so zeroing this constant disables both the hard
+	// limit (isAtUserLimit treats 0 as "no limit") and the soft-limit
+	// warning, and the webapp limits banner hides itself when the API
+	// reports zero limits. Licensed seat enforcement is unaffected.
+	maxUsersLimit     = 0
+	maxUsersHardLimit = 0
 )
 
 // GetServerLimits returns the server's seat/post-history limits. The license-derived

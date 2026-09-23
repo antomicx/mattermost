@@ -1,0 +1,233 @@
+diff --git a/server/channels/api4/limits_test.go b/server/channels/api4/limits_test.go
+index b4d4d8089f..1beb52eeed 100644
+--- a/server/channels/api4/limits_test.go
++++ b/server/channels/api4/limits_test.go
+@@ -27,9 +27,10 @@ func TestGetServerLimits(t *testing.T) {
+ 		CheckOKStatus(t, resp)
+ 
+ 		// Should have full access to all limits data
++		// MBI-0001: unlicensed servers are unlimited in the MBI build
+ 		require.Greater(t, serverLimits.ActiveUserCount, int64(0))
+-		require.Equal(t, int64(200), serverLimits.MaxUsersLimit)
+-		require.Equal(t, int64(250), serverLimits.MaxUsersHardLimit)
++		require.Equal(t, int64(0), serverLimits.MaxUsersLimit)
++		require.Equal(t, int64(0), serverLimits.MaxUsersHardLimit)
+ 		require.Equal(t, int64(0), serverLimits.PostHistoryLimit)
+ 		require.Equal(t, int64(0), serverLimits.LastAccessiblePostTime)
+ 	})
+diff --git a/server/channels/app/limits.go b/server/channels/app/limits.go
+index 45448e4b2b..a4893731d0 100644
+--- a/server/channels/app/limits.go
++++ b/server/channels/app/limits.go
+@@ -10,8 +10,14 @@ import (
+ )
+ 
+ const (
+-	maxUsersLimit     = 200
+-	maxUsersHardLimit = 250
++	// MBI-0001: the open-source user cap is removed in the MBI build. The
++	// unlicensed enforcement branch in GetServerLimits is guarded by
++	// `maxUsersLimit > 0`, so zeroing this constant disables both the hard
++	// limit (isAtUserLimit treats 0 as "no limit") and the soft-limit
++	// warning, and the webapp limits banner hides itself when the API
++	// reports zero limits. Licensed seat enforcement is unaffected.
++	maxUsersLimit     = 0
++	maxUsersHardLimit = 0
+ )
+ 
+ // GetServerLimits returns the server's seat/post-history limits. The license-derived
+diff --git a/server/channels/app/limits_test.go b/server/channels/app/limits_test.go
+index 2127ac3df8..e636377476 100644
+--- a/server/channels/app/limits_test.go
++++ b/server/channels/app/limits_test.go
+@@ -17,7 +17,10 @@ import (
+ func TestGetServerLimits(t *testing.T) {
+ 	mainHelper.Parallel(t)
+ 
+-	t.Run("unlicensed server shows hard-coded limits", func(t *testing.T) {
++	t.Run("unlicensed server shows no limits", func(t *testing.T) {
++		// MBI-0001: upstream asserts the hard-coded 200/250 Team Edition
++		// cap here. The MBI build zeroes the constants, so an unlicensed
++		// server must report zero (== unlimited) limits.
+ 		th := Setup(t).InitBasic(t)
+ 
+ 		th.App.Srv().SetLicense(nil)
+@@ -27,8 +30,8 @@ func TestGetServerLimits(t *testing.T) {
+ 
+ 		// InitBasic creates 3 users by default
+ 		require.Equal(t, int64(3), serverLimits.ActiveUserCount)
+-		require.Equal(t, int64(200), serverLimits.MaxUsersLimit)
+-		require.Equal(t, int64(250), serverLimits.MaxUsersHardLimit)
++		require.Equal(t, int64(0), serverLimits.MaxUsersLimit)
++		require.Equal(t, int64(0), serverLimits.MaxUsersHardLimit)
+ 	})
+ 
+ 	t.Run("user counts are skipped when includeUserCounts is false", func(t *testing.T) {
+@@ -43,12 +46,13 @@ func TestGetServerLimits(t *testing.T) {
+ 
+ 		// Without counts the expensive count queries are skipped, so the count is zero even
+ 		// though users exist. The cheap license-derived limits are still returned.
++		// MBI-0001: unlicensed limits are zero (unlimited) in the MBI build.
+ 		withoutCounts, appErr := th.App.GetServerLimits(false)
+ 		require.Nil(t, appErr)
+ 		require.Equal(t, int64(0), withoutCounts.ActiveUserCount)
+ 		require.Equal(t, int64(0), withoutCounts.SingleChannelGuestCount)
+-		require.Equal(t, int64(200), withoutCounts.MaxUsersLimit)
+-		require.Equal(t, int64(250), withoutCounts.MaxUsersHardLimit)
++		require.Equal(t, int64(0), withoutCounts.MaxUsersLimit)
++		require.Equal(t, int64(0), withoutCounts.MaxUsersHardLimit)
+ 	})
+ 
+ 	t.Run("user count should increase on creating new user and decrease on permanently deleting", func(t *testing.T) {
+@@ -280,52 +284,26 @@ func TestIsAtUserLimit(t *testing.T) {
+ 	mainHelper.Parallel(t)
+ 
+ 	t.Run("unlicensed server", func(t *testing.T) {
+-		t.Run("below hard limit", func(t *testing.T) {
+-			th := SetupWithStoreMock(t)
+-
+-			th.App.Srv().SetLicense(nil)
+-
+-			mockUserStore := storemocks.UserStore{}
+-			mockUserStore.On("Count", mock.Anything).Return(int64(200), nil) // Under hard limit of 250
+-			mockUserStore.On("AnalyticsGetSingleChannelGuestCount").Return(int64(0), nil)
+-			mockStore := th.App.Srv().Store().(*storemocks.Store)
+-			mockStore.On("User").Return(&mockUserStore)
+-
+-			atLimit, appErr := th.App.isAtUserLimit()
+-			require.Nil(t, appErr)
+-			require.False(t, atLimit)
+-		})
+-
+-		t.Run("at hard limit", func(t *testing.T) {
+-			th := SetupWithStoreMock(t)
+-
+-			th.App.Srv().SetLicense(nil)
+-
+-			mockUserStore := storemocks.UserStore{}
+-			mockUserStore.On("Count", mock.Anything).Return(int64(250), nil) // At hard limit of 250
+-			mockUserStore.On("AnalyticsGetSingleChannelGuestCount").Return(int64(0), nil)
+-			mockStore := th.App.Srv().Store().(*storemocks.Store)
+-			mockStore.On("User").Return(&mockUserStore)
+-
+-			atLimit, appErr := th.App.isAtUserLimit()
+-			require.Nil(t, appErr)
+-			require.True(t, atLimit)
+-		})
+-
+-		t.Run("above hard limit", func(t *testing.T) {
+-			th := SetupWithStoreMock(t)
+-
+-			th.App.Srv().SetLicense(nil)
+-
+-			mockUserStore := storemocks.UserStore{}
+-			mockUserStore.On("Count", mock.Anything).Return(int64(300), nil) // Over hard limit of 250
+-			mockUserStore.On("AnalyticsGetSingleChannelGuestCount").Return(int64(0), nil)
+-			mockStore := th.App.Srv().Store().(*storemocks.Store)
+-			mockStore.On("User").Return(&mockUserStore)
+-
+-			atLimit, appErr := th.App.isAtUserLimit()
+-			require.Nil(t, appErr)
+-			require.True(t, atLimit)
++		// MBI-0001: the MBI build zeroes the user cap, so an unlicensed
++		// server reports no limit at any active-user count. Upstream's
++		// "at / above hard limit" subtests asserted true against the
++		// 250-user cap; they are collapsed into a single unlimited check.
++		t.Run("no limit at any count", func(t *testing.T) {
++			for _, count := range []int64{200, 250, 300} {
++				th := SetupWithStoreMock(t)
++
++				th.App.Srv().SetLicense(nil)
++
++				mockUserStore := storemocks.UserStore{}
++				mockUserStore.On("Count", mock.Anything).Return(count, nil)
++				mockUserStore.On("AnalyticsGetSingleChannelGuestCount").Return(int64(0), nil)
++				mockStore := th.App.Srv().Store().(*storemocks.Store)
++				mockStore.On("User").Return(&mockUserStore)
++
++				atLimit, appErr := th.App.isAtUserLimit()
++				require.Nil(t, appErr)
++				require.False(t, atLimit)
++			}
+ 		})
+ 	})
+ 
+@@ -547,9 +525,9 @@ func TestExtraUsersBehavior(t *testing.T) {
+ 		serverLimits, appErr := th.App.GetServerLimits(true)
+ 		require.Nil(t, appErr)
+ 
+-		// Unlicensed servers use hard-coded limits without extra users
+-		require.Equal(t, int64(200), serverLimits.MaxUsersLimit)
+-		require.Equal(t, int64(250), serverLimits.MaxUsersHardLimit)
++		// MBI-0001: unlicensed servers are unlimited in the MBI build
++		require.Equal(t, int64(0), serverLimits.MaxUsersLimit)
++		require.Equal(t, int64(0), serverLimits.MaxUsersHardLimit)
+ 	})
+ }
+ 
+diff --git a/server/channels/app/user_limits_test.go b/server/channels/app/user_limits_test.go
+index 22de61502c..bbff8bf0b2 100644
+--- a/server/channels/app/user_limits_test.go
++++ b/server/channels/app/user_limits_test.go
+@@ -32,55 +32,12 @@ func TestUpdateActiveWithUserLimits(t *testing.T) {
+ 			require.Equal(t, int64(0), updatedUser.DeleteAt)
+ 		})
+ 
+-		t.Run("reactivation blocked at hard limit", func(t *testing.T) {
+-			th := SetupWithStoreMock(t)
+-
+-			th.App.Srv().SetLicense(nil)
+-
+-			// Mock user count at hard limit
+-			mockUserStore := storemocks.UserStore{}
+-			mockUserStore.On("Count", mock.Anything).Return(int64(5000), nil) // At 5000 hard limit
+-			mockStore := th.App.Srv().Store().(*storemocks.Store)
+-			mockStore.On("User").Return(&mockUserStore)
+-
+-			user := &model.User{
+-				Id:       model.NewId(),
+-				Email:    "test@example.com",
+-				Username: "testuser",
+-				DeleteAt: model.GetMillis(),
+-			}
+-
+-			// Try to reactivate user (should fail)
+-			updatedUser, appErr := th.App.UpdateActive(th.Context, user, true)
+-			require.NotNil(t, appErr)
+-			require.Nil(t, updatedUser)
+-			require.Equal(t, "app.user.update_active.user_limit.exceeded", appErr.Id)
+-		})
+-
+-		t.Run("reactivation blocked above hard limit", func(t *testing.T) {
+-			th := SetupWithStoreMock(t)
+-
+-			th.App.Srv().SetLicense(nil)
+-
+-			// Mock user count to exceed hard limit
+-			mockUserStore := storemocks.UserStore{}
+-			mockUserStore.On("Count", mock.Anything).Return(int64(6000), nil) // Over 5000 hard limit
+-			mockStore := th.App.Srv().Store().(*storemocks.Store)
+-			mockStore.On("User").Return(&mockUserStore)
+-
+-			user := &model.User{
+-				Id:       model.NewId(),
+-				Email:    "test@example.com",
+-				Username: "testuser",
+-				DeleteAt: model.GetMillis(),
+-			}
+-
+-			// Try to reactivate user (should fail)
+-			updatedUser, appErr := th.App.UpdateActive(th.Context, user, true)
+-			require.NotNil(t, appErr)
+-			require.Nil(t, updatedUser)
+-			require.Equal(t, "app.user.update_active.user_limit.exceeded", appErr.Id)
+-		})
++		// MBI-0001: upstream's "reactivation blocked at/above hard limit"
++		// subtests verified the unlicensed 250-user cap. The MBI build
++		// removes that cap, so an unlicensed server never blocks
++		// reactivation; unlimited behavior is asserted in
++		// TestIsAtUserLimit/unlicensed server. A reactivation must not
++		// fail on count grounds at previously-blocking totals.
+ 	})
+ 
+ 	t.Run("licensed server with seat count enforcement", func(t *testing.T) {

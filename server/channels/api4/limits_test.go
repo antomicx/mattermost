@@ -27,9 +27,10 @@ func TestGetServerLimits(t *testing.T) {
 		CheckOKStatus(t, resp)
 
 		// Should have full access to all limits data
+		// MBI-0001: unlicensed servers are unlimited in the MBI build
 		require.Greater(t, serverLimits.ActiveUserCount, int64(0))
-		require.Equal(t, int64(200), serverLimits.MaxUsersLimit)
-		require.Equal(t, int64(250), serverLimits.MaxUsersHardLimit)
+		require.Equal(t, int64(0), serverLimits.MaxUsersLimit)
+		require.Equal(t, int64(0), serverLimits.MaxUsersHardLimit)
 		require.Equal(t, int64(0), serverLimits.PostHistoryLimit)
 		require.Equal(t, int64(0), serverLimits.LastAccessiblePostTime)
 	})

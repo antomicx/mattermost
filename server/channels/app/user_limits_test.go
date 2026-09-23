@@ -32,55 +32,12 @@ func TestUpdateActiveWithUserLimits(t *testing.T) {
 			require.Equal(t, int64(0), updatedUser.DeleteAt)
 		})
 
-		t.Run("reactivation blocked at hard limit", func(t *testing.T) {
-			th := SetupWithStoreMock(t)
-
-			th.App.Srv().SetLicense(nil)
-
-			// Mock user count at hard limit
-			mockUserStore := storemocks.UserStore{}
-			mockUserStore.On("Count", mock.Anything).Return(int64(5000), nil) // At 5000 hard limit
-			mockStore := th.App.Srv().Store().(*storemocks.Store)
-			mockStore.On("User").Return(&mockUserStore)
-
-			user := &model.User{
-				Id:       model.NewId(),
-				Email:    "test@example.com",
-				Username: "testuser",
-				DeleteAt: model.GetMillis(),
-			}
-
-			// Try to reactivate user (should fail)
-			updatedUser, appErr := th.App.UpdateActive(th.Context, user, true)
-			require.NotNil(t, appErr)
-			require.Nil(t, updatedUser)
-			require.Equal(t, "app.user.update_active.user_limit.exceeded", appErr.Id)
-		})
-
-		t.Run("reactivation blocked above hard limit", func(t *testing.T) {
-			th := SetupWithStoreMock(t)
-
-			th.App.Srv().SetLicense(nil)
-
-			// Mock user count to exceed hard limit
-			mockUserStore := storemocks.UserStore{}
-			mockUserStore.On("Count", mock.Anything).Return(int64(6000), nil) // Over 5000 hard limit
-			mockStore := th.App.Srv().Store().(*storemocks.Store)
-			mockStore.On("User").Return(&mockUserStore)
-
-			user := &model.User{
-				Id:       model.NewId(),
-				Email:    "test@example.com",
-				Username: "testuser",
-				DeleteAt: model.GetMillis(),
-			}
-
-			// Try to reactivate user (should fail)
-			updatedUser, appErr := th.App.UpdateActive(th.Context, user, true)
-			require.NotNil(t, appErr)
-			require.Nil(t, updatedUser)
-			require.Equal(t, "app.user.update_active.user_limit.exceeded", appErr.Id)
-		})
+		// MBI-0001: upstream's "reactivation blocked at/above hard limit"
+		// subtests verified the unlicensed 250-user cap. The MBI build
+		// removes that cap, so an unlicensed server never blocks
+		// reactivation; unlimited behavior is asserted in
+		// TestIsAtUserLimit/unlicensed server. A reactivation must not
+		// fail on count grounds at previously-blocking totals.
 	})
 
 	t.Run("licensed server with seat count enforcement", func(t *testing.T) {
