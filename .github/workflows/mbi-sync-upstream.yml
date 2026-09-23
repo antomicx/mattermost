@@ -1,7 +1,7 @@
 # MBI: keep the integration branch in sync with the upstream ESR line.
 # Merges upstream release-11.7 into mbi/11.7.x; on a clean merge opens a PR
-# (CI runs the sentinel regression tests per mbi/BUILD.md). On a conflict,
-# opens an issue for manual rebase. Never force-pushes.
+# (CI runs the sentinel regression tests per mbi/BUILD.md). On a conflict the run
+# fails with an annotation and pushes nothing; manual rebase per mbi/BUILD.md follows.
 #
 # NOTE: GitHub only evaluates `on.schedule` from the repo default branch, so
 # this file must also exist on `master` to stay enabled; it checks out
@@ -17,7 +17,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  issues: write
 
 jobs:
   sync:
@@ -90,13 +89,10 @@ jobs:
       - name: Flag conflicting sync
         if: steps.merge.outputs.state == 'conflict'
         env:
-          GH_TOKEN: ${{ github.token }}
           DESC: ${{ steps.merge.outputs.desc }}
         run: |
-          gh issue create \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "MBI sync conflict on $DESC — manual rebase needed" \
-            --body "The automated merge of \`$DESC\` into \`$TARGET_BRANCH\` conflicts with the MBI patch set. Rebase per \`mbi/BUILD.md\` (Branching an upgrade). No branch was pushed."
+          echo "::error file=patches/README.md::Upstream sync conflict on ${DESC} - manual rebase needed (see mbi/BUILD.md 'Branching an upgrade'). Nothing was pushed."
+          exit 1
 
       - name: Report no-op
         if: steps.merge.outputs.state == 'uptodate'

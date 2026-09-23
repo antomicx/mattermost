@@ -34,8 +34,10 @@ hunks without re-justifying it (rule 4 in `patches/README.md`).
 `release-11.7` weekly (Mondays 06:00 UTC), merges it into `mbi/11.7.x`,
 and opens a sync PR — the fork's own `server-ci.yml` runs the server
 test suite (including the sentinel `TestGetServerLimits`) on that PR.
-On a conflict the merge is aborted and an issue is opened for the manual
-rebase above. It never force-pushes `mbi/11.7.x`.
+On a conflict the merge is aborted, the run fails with an annotation, and
+nothing is pushed — the manual rebase below is then in order. It never
+force-pushes `mbi/11.7.x`. (The fork has issues disabled, so conflicts
+surface as a red scheduled run, not an issue.)
 
 The **master** copy of that workflow file is what enables the schedule
 (GitHub evaluates cron only from the default branch); the branch copy
