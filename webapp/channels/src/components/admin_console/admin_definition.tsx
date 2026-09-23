@@ -4857,10 +4857,11 @@ const AdminDefinition: AdminDefinitionType = {
             openid: {
                 url: 'authentication/openid',
                 title: defineMessage({id: 'admin.sidebar.openid', defaultMessage: 'OpenID Connect'}),
-                isHidden: it.any(
-                    it.all(it.not(it.licensedForFeature('OpenId')), it.not(it.cloudLicensed)),
-                    it.not(it.userHasReadPermissionOnResource(RESOURCE_KEYS.AUTHENTICATION.OPENID)),
-                ),
+
+                // MBI-0002: generic OIDC is implemented in the AGPL server;
+                // upstream hid this page behind a license. Visible whenever
+                // the admin has read access to the setting.
+                isHidden: it.not(it.userHasReadPermissionOnResource(RESOURCE_KEYS.AUTHENTICATION.OPENID)),
                 schema: {
                     id: 'OpenIdSettings',
                     name: defineMessage({id: 'admin.authentication.openid', defaultMessage: 'OpenID Connect'}),
@@ -5226,9 +5227,14 @@ const AdminDefinition: AdminDefinitionType = {
                 url: 'authentication/openid',
                 isDiscovery: true,
                 title: defineMessage({id: 'admin.sidebar.openid', defaultMessage: 'OpenID Connect'}),
-                isHidden: it.any(
-                    it.any(it.licensedForFeature('OpenId'), it.cloudLicensed),
-                ),
+
+                // MBI-0002: the upsell page duplicates the real OIDC URL and
+                // only exists to sell the license-gated feature. The real
+                // page is always visible in the MBI build, so this one never
+                // is. (Upstream: isHidden: licensedForFeature('OpenId') || cloudLicensed.)
+                // Note: a function, not the boolean `true`, because the sidebar
+                // index calls isHidden unconditionally.
+                isHidden: () => true,
                 schema: {
                     id: 'OpenIdSettings',
                     name: defineMessage({id: 'admin.authentication.openid', defaultMessage: 'OpenID Connect'}),

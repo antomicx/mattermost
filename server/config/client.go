@@ -360,9 +360,14 @@ func GenerateLimitedClientConfig(c *model.Config, telemetryID string, license *m
 	props["SamlLoginButtonTextColor"] = ""
 	props["EnableSignUpWithGoogle"] = "false"
 	props["EnableSignUpWithOffice365"] = "false"
-	props["EnableSignUpWithOpenId"] = "false"
-	props["OpenIdButtonText"] = ""
-	props["OpenIdButtonColor"] = ""
+	// MBI-0002: generic OIDC sign-in is implemented entirely in the AGPL
+	// tree; upstream only withheld the client props behind a license.
+	// Publish them from the config unconditionally so the login/signup
+	// button honors OpenIdSettings.Enable on unlicensed servers. The
+	// licensed branch below re-publishes identical values when licensed.
+	props["EnableSignUpWithOpenId"] = strconv.FormatBool(*c.OpenIdSettings.Enable)
+	props["OpenIdButtonText"] = *c.OpenIdSettings.ButtonText
+	props["OpenIdButtonColor"] = *c.OpenIdSettings.ButtonColor
 	props["CWSURL"] = ""
 	props["EnableCustomBrand"] = strconv.FormatBool(*c.TeamSettings.EnableCustomBrand)
 	props["CustomBrandText"] = *c.TeamSettings.CustomBrandText
