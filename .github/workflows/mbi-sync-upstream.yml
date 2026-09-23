@@ -1,0 +1,103 @@
+# MBI: keep the integration branch in sync with the upstream ESR line.
+# Merges upstream release-11.7 into mbi/11.7.x; on a clean merge opens a PR
+# (CI runs the sentinel regression tests per mbi/BUILD.md). On a conflict,
+# opens an issue for manual rebase. Never force-pushes.
+#
+# NOTE: GitHub only evaluates `on.schedule` from the repo default branch, so
+# this file must also exist on `master` to stay enabled; it checks out
+# mbi/11.7.x itself.
+
+name: MBI Sync Upstream
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_BRANCH: release-11.7
+      TARGET_BRANCH: mbi/11.7.x
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Merge upstream (or flag conflicts)
+        id: merge
+        run: |
+          git config user.name "mbi-sync-bot"
+          git config user.email "mbi-sync@mbigroup.it"
+          git fetch https://github.com/mattermost/mattermost.git \
+            "+refs/heads/${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
+          U="upstream/${UPSTREAM_BRANCH}"
+          HEAD_SHA="$(git rev-parse "$U^{commit}")"
+          TAG="$(git tag --points-at "$HEAD_SHA" | grep -E '^v11\.[0-9]+\.[0-9]+$' | head -1 || true)"
+          DESC="${TAG:-$U (${HEAD_SHA:0:12})}"
+
+          if git merge-base --is-ancestor "$U" HEAD; then
+            echo "Already up to date with ${DESC}."
+            echo "state=uptodate" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git merge --no-ff -q -m "Merge ${DESC} into ${TARGET_BRANCH} (automated upstream sync; sentinels run on PR CI, see mbi/BUILD.md)" "$U"; then
+            echo "state=merged" >> "$GITHUB_OUTPUT"
+            echo "desc=$DESC" >> "$GITHUB_OUTPUT"
+            git push -f origin "HEAD:refs/heads/mbi/sync-upstream"
+          else
+            git merge --abort || true
+            echo "state=conflict" >> "$GITHUB_OUTPUT"
+            echo "desc=$DESC" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Close stale sync PR (idempotence)
+        if: steps.merge.outputs.state == 'merged'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A pending sync PR from a previous run is superseded by this one.
+          for n in $(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+                       --head mbi/sync-upstream --base "$TARGET_BRANCH" \
+                       --json number --jq '.[].number'); do
+            gh pr close "$n" --repo "$GITHUB_REPOSITORY" --comment "Superseded by a newer upstream sync." || true
+          done
+
+      - name: Open sync PR
+        if: steps.merge.outputs.state == 'merged'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESC: ${{ steps.merge.outputs.desc }}
+        run: |
+          printf '%s\n' \
+            "Automated merge of \`$DESC\` from mattermost/mattermost \`$UPSTREAM_BRANCH\` into \`$TARGET_BRANCH\` (procedure: \`mbi/BUILD.md\`)." \
+            "" \
+            "Sentinels enforced by CI on this PR:" \
+            "- unlicensed \`GET /api/v4/limits\` reports \`maxUsersHardLimit == 0\` (patch 0001)" \
+            "- OIDC client props published without license (patch 0002, \`go test ./config/\`)" \
+            > /tmp/pr-body.md
+          gh pr create --repo "$GITHUB_REPOSITORY" --head mbi/sync-upstream \
+            --base "$TARGET_BRANCH" --title "MBI sync: $DESC" --body-file /tmp/pr-body.md
+
+      - name: Flag conflicting sync
+        if: steps.merge.outputs.state == 'conflict'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESC: ${{ steps.merge.outputs.desc }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "MBI sync conflict on $DESC — manual rebase needed" \
+            --body "The automated merge of \`$DESC\` into \`$TARGET_BRANCH\` conflicts with the MBI patch set. Rebase per \`mbi/BUILD.md\` (Branching an upgrade). No branch was pushed."
+
+      - name: Report no-op
+        if: steps.merge.outputs.state == 'uptodate'
+        run: echo "${TARGET_BRANCH} is current with upstream ${UPSTREAM_BRANCH}."
